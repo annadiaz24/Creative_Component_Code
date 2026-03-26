@@ -1,0 +1,170 @@
+---
+title: "CC_proj"
+author: "Anna Diaz"
+date: "2026-03-05"
+output: html_document
+---
+
+Setup
+```{r}
+setwd("~/Desktop/AMES_LAB/CODE_STUFF")
+
+library(tidyverse)
+library(scales) # For elegant axis formatting
+```
+
+Load and Prep Data
+```{r}
+# 1. Load and prep the data
+df <- read_csv("matrix_surrogate_dataset.csv", show_col_types = FALSE) %>%
+  # Filter out any infinite or NA values in our target columns
+  filter(is.finite(eig_error_relative), is.finite(cond_input)) %>%
+  # Create our log-transformed columns and factors for grouping
+  mutate(
+    log_cond_input = log10(cond_input),
+    log_error = log10(eig_error_relative),
+    # Convert grouping variables to factors so ggplot treats them as discrete categories
+    size_fct = as.factor(size),
+    scale_fct = as.factor(scale)
+  )
+```
+
+Facet Plot
+```{r}
+# create missing label column for facets 
+df <- df %>%
+  mutate(scale_label = paste0("Scale (s) = ", scale))
+
+p_multi <- ggplot(df, aes(x = as.factor(log_cond_input), y = log_error, color = size_fct)) +
+  # Jitter and dodge the dots inside each panel
+  geom_point(position = position_jitterdodge(jitter.width = 0.2, 
+                                             dodge.width = 0.6), 
+             alpha = 0.6, size = 2) +
+  facet_wrap(~ scale_label) + # Creates the 3 side-by-side panels
+  scale_color_viridis_d(option = "viridis") +
+  # Format axes to 10^x
+  scale_x_discrete(labels = function(x) parse(text=paste0("10^", x))) +
+  scale_y_continuous(labels = math_format(10^.x)) +
+  labs(
+    title = "Error Scaling by Dimension, Condition, and Scale",
+    x = expression("Condition Number (" * kappa * ")"),
+    y = "Relative Error",
+    color = "Dimension (n)"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "right")
+
+ggsave("R_error_multipanel.png", plot = p_multi, width = 12, height = 5, 
+       dpi = 300, bg = "white")
+print(p_multi)
+```
+
+Main Error Plot (All data)
+```{r}
+p2 <- ggplot(df, aes(x = as.factor(log_cond_input), y = log_error, 
+                     color = size_fct, shape = scale_fct)) +
+  # position_jitterdodge adds randomness inside the dodged columns!
+  geom_point(position = position_jitterdodge(jitter.width = 0.15, 
+                                             dodge.width = 0.6), 
+             size = 2.5, alpha = 0.6) +
+  scale_color_viridis_d(option = "viridis") +
+  # Format axes to 10^x
+  scale_x_discrete(labels = function(x) parse(text=paste0("10^", x))) +
+  scale_y_continuous(labels = math_format(10^.x)) +
+  labs(
+    title = "Algorithm Error: Grouped by Dimension and Scale",
+    x = expression("Condition Number (" * kappa * ")"),
+    y = "Relative Error",
+    color = "Dimension (n)", 
+    shape = "Scale (s)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+# Save and show Plot 2
+ggsave("R_error_main_plot.png", plot = p2, width = 10, height = 6, dpi = 300,
+       bg = "white")
+print(p2)
+```
+
+
+Plot the Variance Analysis (Standard Deviation)
+```{r}
+# Calculate the standard deviation for each group
+df_std <- df %>%
+  group_by(log_cond_input, size_fct, scale_fct) %>%
+  summarise(std_log_error = sd(log_error), .groups = 'drop')
+
+p1 <- ggplot(df_std, aes(x = as.factor(log_cond_input), y = std_log_error, 
+                         color = size_fct, shape = scale_fct)) +
+  # position_dodge neatly separates the shapes side-by-side
+  geom_point(position = position_dodge(width = 0.5), size = 4, alpha = 0.8) +
+  scale_color_viridis_d(option = "viridis") + 
+  # Format the X-axis to show 10^x
+  scale_x_discrete(labels = function(x) parse(text=paste0("10^", x))) +
+  labs(
+    title = "Variance Analysis: Grouped by Dimension and Scale",
+    x = expression("Condition Number (" * kappa * ")"),
+    y = expression("Standard Deviation of " * log[10] * "(Error)"),
+    color = "Dimension (n)", 
+    shape = "Scale (s)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+# Save and show Plot 1
+ggsave("R_error_std_plot.png", plot = p1, width = 10, height = 6, dpi = 300,
+       bg = "white")
+print(p1)
+```
+
+
+Mean analysis
+```{r}
+# Calculate the standard deviation for each group
+df_mean <- df %>%
+  group_by(log_cond_input, size_fct, scale_fct) %>%
+  summarise(mean_log_error = mean(log_error), .groups = 'drop')
+
+p_mean <- ggplot(df_mean, aes(x = as.factor(log_cond_input), y = mean_log_error, 
+                              color = size_fct, shape = scale_fct)) +
+  # Add the points on top, dodged to align perfectly
+  geom_point(position = position_dodge(width = 0.6), size = 4.5, alpha = 0.9) +
+  # Enforce the consistent Viridis color scheme
+  scale_color_viridis_d(option = "viridis") + 
+  # Format the X-axis to show 10^x
+  scale_x_discrete(labels = function(x) parse(text=paste0("10^", x))) +
+  labs(
+    title = "Average Error: Grouped by Dimension and Scale",
+    x = expression("Condition Number (" * kappa * ")"),
+    y = expression("Mean " * log[10] * "(Relative Error)"),
+    color = "Dimension (n)", 
+    shape = "Scale (s)"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "right",
+        panel.grid.minor = element_blank())
+
+ggsave("R_error_mean_plot.png", plot = p_mean, width = 10, height = 6, 
+       dpi = 300, bg = "white")
+print(p_mean)
+```
+
+Fitting Linear Regression:
+```{r}
+# 1. Linear Regression on the Mean Error
+# We use log_cond_input (numeric) to find the slope, and include size and scale as adjustments
+lm_mean <- lm(mean_log_error ~ log_cond_input + size_fct + scale_fct, 
+              data = df_mean)
+
+print("=== Linear Regression Results: MEAN ERROR ===")
+summary(lm_mean)
+
+# 2. Linear Regression on the Standard Deviation (Variance)
+lm_std <- lm(std_log_error ~ log_cond_input + size_fct + scale_fct, 
+             data = df_std)
+
+print("=== Linear Regression Results: STANDARD DEVIATION ===")
+summary(lm_std)
+```
+
