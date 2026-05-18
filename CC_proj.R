@@ -325,7 +325,6 @@ p_indicator <- ggplot() +
   theme_minimal(base_size = 14) +
   theme(legend.position = "right")
 
-# Save and show
 ggsave("Indicator_Model_Plot.png", plot = p_indicator, width = 10, height = 5, 
        bg = "white")
 print(p_indicator)
