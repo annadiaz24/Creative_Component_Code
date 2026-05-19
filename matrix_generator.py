@@ -22,13 +22,15 @@ def generate_matrix_pair(n, condition_number =1e2, scale=1.0,seed=None):
         np.random.seed(seed)
     
     #random orthogonal matrix
-    Q,_ = np.linalg.qr(np.random.randn(n,n))
+    M_A = np.random.randn(n,n)
+    Q_A,_ = np.linalg.qr(M_A)
     eigs = np.geomspace(1, condition_number, n)
-    A = Q @ np.diag(eigs) @ Q.T * scale
+    A = Q_A @ np.diag(eigs) @ Q_A.T * scale
 
-    R,_= np.linalg.qr(np.random.randn(n,n))
+    M_B = np.random.randn(n,n)
+    Q_B,_= np.linalg.qr(M_B)
     eigs_B = np.geomspace(1, condition_number, n)
-    B = R @ np.diag(eigs_B) @ R.T * scale
+    B = Q_B @ np.diag(eigs_B) @ Q_B.T * scale
 
     return A, B 
 
