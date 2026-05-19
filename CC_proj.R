@@ -296,7 +296,7 @@ pred_grid_mean$predicted_mean <- predict(best_indicator_model, pred_grid_mean)
 p_indicator <- ggplot() +
   # THE DOTS: Raw data from 'df'
   geom_point(data = df, 
-             aes(x = as.factor(log10(cond_input)), y = eig_error_relative, 
+             aes(x = as.factor(log10(cond_input)), y = log10(eig_error_relative), 
                  color = as.factor(dim), shape = as.factor(scale)), 
              position = position_jitterdodge(jitter.width = 0.15, 
                                              dodge.width = 0.6), 
@@ -305,15 +305,14 @@ p_indicator <- ggplot() +
   # THE MODEL LINES: Structural break lines from 'pred_grid_mean'
   # Mapping both shape and linetype to scale_fct with the same name merges them
   geom_line(data = pred_grid_mean, 
-            aes(x = as.factor(log10(cond_input)), y = 10^(predicted_mean), 
+            aes(x = as.factor(log10(cond_input)), y = (predicted_mean), 
                 group = interaction(dim_fct, scale_fct), 
                 color = dim_fct, linetype = scale_fct), 
             linewidth = 1.2) +
   
   scale_color_viridis_d(option = "viridis") + 
   scale_x_discrete(labels = function(x) parse(text=paste0("10^", x))) +
-  scale_y_log10(labels = scales::label_math(10^.x)) +
-
+  scale_y_continuous(labels = scales::label_math(10^.x)) +
   labs(
     title = "Structural Break Model: Mean Relative Error",
     x = expression("Condition Number (" * kappa * ")"),
@@ -330,3 +329,4 @@ ggsave("Indicator_Model_Plot.png", plot = p_indicator, width = 10, height = 5,
 print(p_indicator)
 
 plot(best_indicator_model)
+
