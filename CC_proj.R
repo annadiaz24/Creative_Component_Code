@@ -1,63 +1,24 @@
----
-title: "CC_proj"
-author: "Anna Diaz"
-date: "2026-03-05"
-output: html_document
----
-
-Setup
-```{r}
 library(tidyverse)
-library(scales) # For elegant axis formatting
+library(scales)
 library(emmeans)
-```
 
-Load and Prep Data
-```{r}
-# 1. Load and prep the data
+# Load and prep the data
 df <- read_csv("matrix_dataset.csv", show_col_types = FALSE) %>%
   # Filter out any infinite or NA values in our target columns
   filter(is.finite(eig_error_relative), is.finite(cond_input)) %>%
-  # Create our log-transformed columns and factors for grouping
   rename(dim = size) %>%
   mutate(
-    # ggplot treats them as discrete categories
     dim_fct = as.factor(dim),
     scale_fct = as.factor(scale),
     scale_label = paste0("Scale (s) = ", scale)
   )
-```
 
-(not used in CC this was just for us to see the data)
-Facet Plot
-```{r}
-p_multi <- ggplot(df, aes(x = log10(cond_input), y = log10(eig_error_relative), color = dim_fct)) +
-  # Jitter and dodge the dots inside each panel
-  geom_point(position = position_jitterdodge(jitter.width = 0.2, 
-                                             dodge.width = 0.6), 
-             alpha = 0.6, size = 2) +
-  facet_wrap(~ scale_label) + # Creates the 3 side-by-side panels
-  scale_color_viridis_d(option = "viridis") +
-  # Format axes to 10^x
-  scale_x_continuous(         breaks = c(2, 4, 6, 8, 12),         labels = function(x) parse(text = paste0("10^", x))       ) +
-  scale_y_continuous(labels = math_format(10^.x)) +
-  labs(
-    title = "Error Scaling by Dimension, Condition, and Scale",
-    x = expression("Condition Number (" * kappa * ")"),
-    y = "Relative Error",
-    color = "Dimension (n)"
-  ) +
-  theme_minimal(base_size = 14) +
-  theme(legend.position = "right")
+# =======================================================================
+# Simulation Results: Algorithm Error
+# =======================================================================
 
-ggsave("R_error_multipanel.png", plot = p_multi, width = 12, height = 5, 
-       dpi = 300, bg = "white")
-print(p_multi)
-```
-
-Main Error Plot (All data)
-```{r}
-p2 <- ggplot(df, aes(x = log10(cond_input), y = log10(eig_error_relative), 
+p1 <- ggplot(df, aes(x = log10(cond_input), 
+                     y = log10(eig_error_relative), 
                      color = dim_fct, shape = scale_fct)) +
   # position_jitterdodge adds randomness inside the dodged columns!
   geom_point(position = position_jitterdodge(jitter.width = 0.15, 
@@ -65,71 +26,68 @@ p2 <- ggplot(df, aes(x = log10(cond_input), y = log10(eig_error_relative),
              size = 2.5, alpha = 0.6) +
   scale_color_viridis_d(option = "viridis") +
   # Format axes to 10^x
-  scale_x_continuous(         breaks = c(2, 4, 6, 8, 12),         labels = function(x) parse(text = paste0("10^", x))       ) +
+  scale_x_continuous(
+    breaks = c(2, 4, 6, 8, 12),
+    labels = function(x) parse(text = paste0("10^", x))
+  ) +
   scale_y_continuous(labels = math_format(10^.x)) +
   labs(
-    title = "Algorithm Error: Grouped by Dimension and Scale",
+    title = "Simulation Results",
     x = expression("Condition Number (" * kappa * ")"),
     y = expression(e[lambda*",rel"]),
     color = "Dimension (n)", 
     shape = "Scale (s)"
   ) +
-  theme_minimal() +
-  theme(
-    legend.position = "right",
-    axis.title = element_text(size = 16),      
-    axis.text = element_text(size = 12),       
-    plot.title = element_text(size = 18)
-  )
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "right")
 
-
-# Save and show Plot 2
-ggsave("R_error_main_plot.png", plot = p2, width = 10, height = 6, dpi = 300,
+ggsave("R_error_main_plot.png", plot = p1, width = 10, height = 6, dpi = 300,
        bg = "white")
-print(p2)
-```
+print(p1)
 
-Plot the Variability Analysis
-```{r}
+# =======================================================================
+# Variability Analysis 
+# =======================================================================
+
 # Calculate the standard deviation for each group
 df_std <- df %>%
   group_by(cond_input, dim, scale, dim_fct, scale_fct) %>%
   summarise(std_log_error = sd(log10(eig_error_relative)), .groups = 'drop')
 
-p1 <- ggplot(df_std, aes(x = log10(cond_input), y = std_log_error, 
+p2 <- ggplot(df_std, aes(x = log10(cond_input), y = std_log_error, 
                          color = dim_fct, shape = scale_fct)) +
   # position_dodge neatly separates the shapes side-by-side
   geom_point(position = position_dodge(width = 0.5), size = 4, alpha = 0.8) +
   scale_color_viridis_d(option = "viridis") + 
   # Format the X-axis to show 10^x
-  scale_x_continuous(         breaks = c(2, 4, 6, 8, 12),         labels = function(x) parse(text = paste0("10^", x))       ) +
+ scale_x_continuous(     
+   breaks = c(2, 4, 6, 8, 12),     
+   labels = function(x) parse(text = paste0("10^", x))   
+   ) +
   scale_y_continuous() +
   labs(
-    title = "Variability Analysis: Grouped by Dimension and Scale",
+    title = "Within-Group Variability Across Condition Number",
     x = expression("Condition Number (" * kappa * ")"),
     y = expression(sigma),
     color = "Dimension (n)", 
     shape = "Scale (s)"
   ) +
-  theme_minimal() +
-  theme(
-    legend.position = "right",
-    axis.title = element_text(size = 16),      
-    axis.text = element_text(size = 12),       
-    plot.title = element_text(size = 18)
-  )
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "right")
 
-ggsave("R_error_std_plot.png", plot = p1, width = 10, height = 6, dpi = 300,
+ggsave("R_error_std_plot.png", plot = p2, width = 10, height = 6, dpi = 300,
        bg = "white")
-print(p1)
-```
+print(p2)
 
-Mean analysis
-```{r}
-# Calculate the standard deviation for each group
+# =======================================================================
+# Average Error: Mean of Relative Error 
+# =======================================================================
+
+# Calculate the averages for each group
 df_mean <- df %>%
   group_by(cond_input, dim, scale, dim_fct, scale_fct) %>%
-  summarise(mean_log_error = mean(log10(eig_error_relative)), .groups = 'drop') 
+  summarise(mean_log_error = mean(log10(eig_error_relative)), .groups = 'drop')
+
 p_mean <- ggplot(df_mean, aes(x = log10(cond_input), 
                               y = mean_log_error, 
                               color = dim_fct, shape = scale_fct)) +
@@ -146,7 +104,7 @@ p_mean <- ggplot(df_mean, aes(x = log10(cond_input),
    ) +
   scale_y_continuous(labels = math_format(10^.x)) +
   labs(
-    title = "Average Error: Grouped by Dimension and Scale",
+    title = "Group Means Across Condition Number",
     x = expression("Condition Number (" * kappa * ")"),
     y = expression("Mean" ~ e[lambda*",rel"]),
     color = "Dimension (n)", 
@@ -159,31 +117,32 @@ p_mean <- ggplot(df_mean, aes(x = log10(cond_input),
 ggsave("R_error_mean_plot.png", plot = p_mean, width = 10, height = 6, 
        dpi = 300, bg = "white")
 print(p_mean)
-```
 
-ALTERNATIVE METHOD: Averaging the Means (Marginal MEAN)
-Calculate the Grand Mean and show why it wouldn't be a good choice to do.
-Averaging the means would flatten the data and ignore the specific conditions. 
-```{r}
-# Calculate the Grand Mean 
+
+# =====================================================================
+# Grand Mean 
+# =====================================================================
+
 # We group by condition number and dimension, completely ignoring the scales.
 df_grand_mean <- df_mean %>%
   group_by(cond_input, dim_fct) %>%
   summarise(grand_mean_error = mean(mean_log_error), .groups = 'drop')
 
-# Plot the Flawed Grand Mean
 p_grand <- ggplot(df_grand_mean, aes(x = log10(cond_input), 
                                      y = grand_mean_error, 
                                      color = dim_fct)) +
-  # Add points and lines to show the false trend
+
   geom_point(position = position_dodge(width = 0.5), size = 4.5, alpha = 0.9) +
   geom_line(aes(group = dim_fct), position = position_dodge(width = 0.5), 
             linewidth = 1) +
   scale_color_viridis_d(option = "viridis") + 
-  scale_x_continuous(         breaks = c(2, 4, 6, 8, 12),         labels = function(x) parse(text = paste0("10^", x))       ) +
+  scale_x_continuous(     
+   breaks = c(2, 4, 6, 8, 12),     
+   labels = function(x) parse(text = paste0("10^", x))
+  ) +
   scale_y_continuous(labels = math_format(10^.x)) +
   labs(
-    title = "Grand Mean Error (Averaged Across Scales)",
+    title = "Effect of Averaging Across Scaling Factor",
     x = expression("Condition Number (" * kappa * ")"),
     y = expression("Grand Mean "~ e[lambda*",rel"]),
     color = "Dimension (n)"
@@ -191,38 +150,21 @@ p_grand <- ggplot(df_grand_mean, aes(x = log10(cond_input),
   theme_minimal(base_size = 14) +
   theme(legend.position = "right")
 
-# Save and show the plot
 ggsave("R_flawed_grand_mean_plot.png", plot = p_grand, width = 10, height = 6, 
        dpi = 300, bg = "white")
 print(p_grand)
-```
 
-Fitting Linear Regression on Mean Error & Variance
-```{r}
-# We use log10(cond_input) (numeric) to find the slope, and include dim and scale as adjustments
-lm_mean <- lm(mean_log_error ~ log10(cond_input) + log10(dim) + log10(scale), 
-              data = df_mean)
+# =======================================================================
+# Continuous Linear model: Mean Relative Error 
+# =======================================================================
 
-print("=== Linear Regression Results: MEAN ERROR ===")
-summary(lm_mean)
-
-# Linear Regression on the Standard Deviation (Variance)
-lm_std <- lm(std_log_error ~ log10(cond_input) + dim_fct + scale_fct, 
-             data = df_std)
-
-print("=== Linear Regression Results: STANDARD DEVIATION ===")
-summary(lm_std)
-```
-
-Fitting an ANOVA model for average error (linear regression averages the trails)
-Things to consider don't treat scale and dimension as categorical factors.
-Treat log condition number, scale, and dim all as continuous as they are numeric. 
-```{r}
+#Fitting ANOVA model for average error
 continuous_model <- lm(log10(eig_error_relative) ~ log10(cond_input) 
                        * log10(dim)
                        * log10(scale), data = df)
+
 # upper and lower tell the stepwise specific models list. 
-print("=== Running Stepwise Selection (Targeting lowest AIC) ===")
+print("=== Running Stepwise Selection: Mean Error Model ===")
 final_model <- step(continuous_model, 
                     scope = list(
                       lower = "~ log10(cond_input) + log10(dim) + log10(scale)",
@@ -232,16 +174,10 @@ final_model <- step(continuous_model,
 print("=== Final Optimized Model ===")
 summary(final_model)
 
-```
-Can check residual plots 
-```{r}
+#check residuals
 plot(final_model)
-```
-Confirms our data is non-linear because of the spike at the end as previously
-mentioned. We may want to consider looking at the data without the other group 
 
-Fit the final model to the plot of relative error
-```{r}
+#Fit the final model to the plot of relative error
 pred_grid_cont <- expand.grid(
   cond_input = unique(df$cond_input),
   dim = unique(df$dim),
@@ -255,13 +191,14 @@ pred_grid_cont <- expand.grid(
 pred_grid_cont$predicted_mean <- predict(final_model, newdata = pred_grid_cont)
 
 p_mean_fit <- ggplot() +
-
   geom_point(data = df, 
-             aes(x = log10(cond_input), y = log10(eig_error_relative), 
+             aes(x = log10(cond_input), 
+                 y = log10(eig_error_relative), 
                  color = as.factor(dim), shape = as.factor(scale)), 
-             position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.6), 
+             position = position_jitterdodge(jitter.width = 0.15, 
+                                             dodge.width = 0.6), 
              size = 2.5, alpha = 0.5) +
-
+  
   geom_line(data = pred_grid_cont, 
             aes(x = log10(cond_input), y = predicted_mean, 
                 group = interaction(dim_fct, scale_fct), 
@@ -270,10 +207,13 @@ p_mean_fit <- ggplot() +
             linewidth = 1.2) +
   
   scale_color_viridis_d(option = "viridis") + 
-  scale_x_continuous(         breaks = c(2, 4, 6, 8, 12),         labels = function(x) parse(text = paste0("10^", x))       ) +
+  scale_x_continuous(     
+   breaks = c(2, 4, 6, 8, 12),     
+   labels = function(x) parse(text = paste0("10^", x))
+  ) +
   scale_y_continuous(labels = math_format(10^.x)) +
   labs(
-    title = "Continuous Linear Model: Mean Relative Error",
+    title = "Fitted Linear Model For Means",
     x = expression("Condition Number (" * kappa * ")"),
     y = expression(e[lambda*",rel"]),
     color = "Dimension (n)", 
@@ -287,43 +227,31 @@ ggsave("R_continuous_model_fit.png", plot = p_mean_fit, width = 10, height = 6,
        dpi = 300, bg = "white")
 print(p_mean_fit)
 
-```
 
-The model is able to bend itself when needed. As previously mentioned the 
-lines are slanted becuase of the big leap in the condition number 10^12, where
-it is not constant from the rest of the data. 
+# =======================================================================
+# Continuous Linear Model: Variability
+# =======================================================================
 
-Stepwise Selection for Variability Analysis
-we saw previously that the 3 way interactions were not significant
-so in choosing a model for the variance analysis, we can use stepwise to proceed. 
-```{r}
+# Stepwise Selection for Variability Analysis
 full_std_model <- lm(std_log_error ~ log10(cond_input) * log10(dim) 
                      * log10(scale), data = df_std)
 
-# run the stepwise 
-print("=== Running Stepwise Selection (Targeting lowest AIC) ===")
+print("=== Running Stepwise Selection: Variability Model ===")
 best_std_model <- step(full_std_model, 
                        scope = list(
-                      lower = "~ log10(cond_input) + log10(dim) + log10(scale)",
-                      upper = "~ log10(cond_input) * log10(dim) * log10(scale)"
-                    ))
+                         lower = "~ log10(cond_input) + log10(dim) + log10(scale)",
+                         upper = "~ log10(cond_input) * log10(dim) * log10(scale)"
+                       ))
 
-print("=== Final Optimized Variance Model ===")
+print("=== Final Optimized Variability Model ===")
 summary(best_std_model)
 
 # generate predictions using the selected BEST model
 df_std$predicted_std <- predict(best_std_model, newdata = df_std)
 
-```
-
-Residuals for Variance model
-```{r}
 plot(best_std_model)
-```
-Residuals don't violate any assumptions.
 
-Final Variability model Plot
-```{r}
+#### Final Variability model 
 # Create a grid of all combinations you want to predict
 pred_grid <- expand.grid(
   cond_input = unique(df_std$cond_input),
@@ -344,7 +272,8 @@ p_std_fit <- ggplot() +
   geom_point(data = df_std, 
              aes(x = log10(cond_input), y = std_log_error, 
                  color = dim_fct, shape = scale_fct), 
-             position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.6), 
+             position = position_jitterdodge(jitter.width = 0.15, 
+                                             dodge.width = 0.6), 
              size = 4, alpha = 0.5) +
   
   # Layer 2: The model lines (from pred_grid)
@@ -355,9 +284,12 @@ p_std_fit <- ggplot() +
             linewidth = 1.2) +
   
   scale_color_viridis_d(option = "viridis") + 
-  scale_x_continuous(         breaks = c(2, 4, 6, 8, 12),         labels = function(x) parse(text = paste0("10^", x))       ) +
+  scale_x_continuous(     
+   breaks = c(2, 4, 6, 8, 12),
+   labels = function(x) parse(text = paste0("10^", x))   
+   ) +
   labs(
-    title = "Continuous Linear Model: Variability",
+    title = "Fitted Linear Model for Variability",
     x = expression("Condition Number (" * kappa * ")"),
     y = expression(sigma),
     color = "Dimension (n)", 
@@ -366,15 +298,15 @@ p_std_fit <- ggplot() +
   ) +
   theme_minimal(base_size = 14)
 
-ggsave("R_continuous_var_model_fit.png", plot = p_std_fit, width = 10, height = 6,
-        dpi = 300, bg = "white")
+ggsave("R_continuous_var_model_fit.png", plot = p_std_fit, width = 10, 
+       height = 6,
+       dpi = 300, bg = "white")
 print(p_std_fit)
 
-```
+# =====================================================================
+# Indicator Model
+# =====================================================================
 
-Create model with additional variable indicator (10^12)
-Model with variable indicator (MEAN analysis)
-```{r}
 # Creating a TRUE/FALSE column, treating it as 1 or 0 (dummy variable)
 df$is_failure <- ifelse(round(log10(df$cond_input)) == 12, 1, 0)
 
@@ -391,12 +323,8 @@ best_indicator_model <- step(indicator_model, direction = "both",
 
 print("=== Final Optimized Indicator Model ===")
 summary(best_indicator_model)
-```
 
-Now graph the indicator model 
-(change ggplot, add all in ggplot not geompoint or geomline)
-create dataframe for predictions (response variable the same for both)
-```{r}
+### Graph Indicator model
 pred_grid_mean <- expand.grid(
   cond_input = unique(df$cond_input),
   dim = unique(df$dim),
@@ -407,8 +335,6 @@ pred_grid_mean <- expand.grid(
     dim_fct = as.factor(dim),
     scale_fct = as.factor(scale)
   )
-
-pred_grid_mean$predicted_mean <- predict(best_indicator_model, pred_grid_mean)
 
 pred_grid_mean$predicted_mean <- predict(best_indicator_model, pred_grid_mean)
 
@@ -430,10 +356,13 @@ p_indicator <- ggplot() +
             linewidth = 1.2) +
   
   scale_color_viridis_d(option = "viridis") + 
-  scale_x_continuous(         breaks = c(2, 4, 6, 8, 12),         labels = function(x) parse(text = paste0("10^", x))       ) +
+  scale_x_continuous(
+   breaks = c(2, 4, 6, 8, 12),
+   labels = function(x) parse(text = paste0("10^", x))
+   ) +
   scale_y_continuous(labels = scales::label_math(10^.x)) +
   labs(
-    title = "Structural Break Model: Mean Relative Error",
+    title = "Fitted Linear Model for Structural Break",
     x = expression("Condition Number (" * kappa * ")"),
     y = expression(e[lambda*",rel"]),
     color = "Dimension (n)", 
@@ -447,5 +376,48 @@ ggsave("Indicator_Model_Plot.png", plot = p_indicator, width = 10, height = 5,
        bg = "white")
 print(p_indicator)
 
-#plot(best_indicator_model)
-```
+plot(best_indicator_model)
+
+# =====================================================================
+# Running F-Test to compare Indicator vs. Non-Indicator Model
+# =====================================================================
+
+# Define the reduced model (Continuous only, including log(dim))
+reduced_model <- lm(log10(eig_error_relative) ~ log10(cond_input) * 
+                      log10(scale) + log10(dim), data = df)
+
+# Define the full model (Indicator + Continuous, including log(dim))
+full_indicator_model <- lm(log10(eig_error_relative) ~ log10(dim) + 
+                        log10(cond_input) * log10(scale) + is_failure + 
+                        is_failure:log10(scale), data = df)
+
+# Compare models using an ANOVA F-test
+print("=== F-Test: Continuous Model vs. Structural Break (Indicator) Model ===")
+anova(reduced_model, full_indicator_model)
+
+# =======================================================================
+# Weighted Regression model: Mean Relative Error (Weighted by Dimension)
+# =======================================================================
+
+# Weighting by matrix dimension gives larger matrices more influence,
+# since larger matrices may produce more numerically stable estimates.
+weighted_continuous_model <- lm(log10(eig_error_relative) ~ log10(cond_input) 
+                                * log10(dim) 
+                                * log10(scale), 
+                                data = df, 
+                                weights = dim)
+
+print("=== Running Stepwise Selection: Weighted Mean Error Model ===")
+final_weighted_model <- step(weighted_continuous_model, 
+                             scope = list(
+                               lower = "~ log10(cond_input) + 
+                               log10(dim) + log10(scale)",
+                               upper = "~ log10(cond_input) * 
+                               log10(dim) * log10(scale)"
+                             ))
+
+print("=== Final Optimized Weighted Model ===")
+summary(final_weighted_model)
+
+# Check residuals of the weighted model
+plot(final_weighted_model)
