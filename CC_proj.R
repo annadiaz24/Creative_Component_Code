@@ -426,23 +426,47 @@ print(p_indicator)
 plot(best_indicator_model)
 
 # =====================================================================
-# Running F-Test to compare Indicator vs. Non-Indicator Model
+# F-Tests to compare CMEM vs. CMEM+ and SBLM vs. CMEM+
 # =====================================================================
 
 # A formal F‑test on nested models quantifies whether the added parameters
 # (failure indicator + its interaction with scale) significantly improve the
 # model fit, justifying the extra complexity of the structural‑break approach.
 
-reduced_model <- lm(log10(eig_error_relative) ~ log10(cond_input) * 
-                      log10(scale) + log10(dim), data = df)
+# CMEM: Continuous Mean Error Model (AIC-selected model)
+# Terms: dim, cond, scale, cond:scale
+model_cmem <- lm(log10(eig_error_relative) ~ log10(dim) + 
+                 log10(cond_input) * log10(scale), 
+                 data = df)
+
+# SBLM: Structural Break Linear Model (AIC-selected model)
+# Terms: dim, cond, scale, failure, failure:scale 
+# (Added log10(dim) back in to ensure perfect nesting)
+model_sblm <- lm(log10(eig_error_relative) ~ log10(dim) + 
+                   log10(cond_input) + log10(scale) + 
+                   is_failure + is_failure:log10(scale), 
+                 data = df)
+
+# CMEM+: Minimal Supermodel (The Union)
+# Terms: dim, cond, scale, cond:scale, failure, failure:scale
+# This contains exactly the terms from CMEM and SBLM combined, and NOTHING else.
+model_cmem_plus <- lm(log10(eig_error_relative) ~ log10(dim) + 
+                        log10(cond_input) * log10(scale) + 
+                        is_failure + is_failure:log10(scale), 
+                      data = df)
 
 
-full_indicator_model <- lm(log10(eig_error_relative) ~ log10(dim) + 
-                        log10(cond_input) * log10(scale) + is_failure + 
-                        is_failure:log10(scale), data = df)
+# --- F-TEST COMPARISONS ---
 
-print("=== F-Test: Continuous Model vs. Structural Break (Indicator) Model ===")
-anova(reduced_model, full_indicator_model)
+# Test 1: CMEM vs. CMEM+
+# Question: Do we need the structural break terms (is_failure and is_failure:scale)?
+print("=== Test 1: Base Model (CMEM) vs. Minimal Supermodel (CMEM+) ===")
+anova(model_cmem, model_cmem_plus)
+
+# Test 2: SBLM vs. CMEM+
+# Question: Do we need the continuous interaction term (cond_input:scale)?
+print("=== Test 2: Selected Break Model (SBLM) vs. Minimal Supermodel (CMEM+) ===")
+anova(model_sblm, model_cmem_plus)
 
 # =======================================================================
 # Weighted Regression model: Mean Relative Error (Weighted by Dimension)
